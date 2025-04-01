@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <style>
+        /* Basic styles for the login form */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Jost', sans-serif;
+        }
+
+        body {
+            background-color: #f4f4f4;
+        }
+
+        .wrapper {
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .form {
+            width: 425px;
+            background: #fff;
+            padding: 35px 50px;
+            border-radius: 2px;
+            box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .form .title {
+            text-align: center;
+            margin-bottom: 20px;
+            font-weight: 700;
+            font-size: 24px;
+        }
+
+        .form .input_wrap {
+            margin-bottom: 20px;
+        }
+
+        .form .input_wrap input {
+            padding: 10px;
+            width: 100%;
+            font-size: 16px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+
+        .form .input_wrap button {
+            padding: 10px;
+            width: 100%;
+            background-color: #00a087;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .form .input_wrap button:hover {
+            background-color: #007f65;
+        }
+
+        .error-message {
+            color: #f74040;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrapper">
+        <div class="form">
+            <div class="title">
+                Login
+            </div>
+            <!-- Form now takes only Device ID -->
+            <form method="POST" action="/login">
+                <div class="input_wrap">
+                    <label for="device_id">Device ID</label>
+                    <input type="text" id="device_id" name="device_id" required>
+                </div>
+
+                <div class="input_wrap">
+                    <button type="submit">Submit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+
+</html>

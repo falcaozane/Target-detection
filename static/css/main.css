@@ -1,0 +1,75 @@
+h1 {
+  color: #00a087;
+  text-align: center;
+}
+
+body, html {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: 'Jost', sans-serif;
+  background-color: #f4f4f4;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#main-container {
+  display: flex;
+  flex-direction: row;
+  width: 90%;
+  height: 100vh;
+  padding: 10px;
+}
+
+#control-panel {
+  width: 30%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 10px;
+  background-color: #fff;
+  border-right: 2px solid #00a087;
+}
+
+#score-info {
+  width: 75%;
+  display: flex;
+  justify-content: space-around;
+  margin: 10px;
+}
+
+#score-board {
+  padding: 10px;
+  border: 2px solid #00a087;
+  text-align: center;
+  margin-left: 20px;
+}
+
+.button, .circle-button {
+  width: 80px;
+  height: 50px;
+  background: #ffffff;
+  border: 2px solid #00a087;
+  border-radius: 5px;
+  margin: 5px;
+  text-align: center;
+  line-height: 50px;
+  cursor: pointer;
+}
+
+.circle-button {
+  border-radius: 50%;
+}
+
+.button:hover, .circle-button:hover {
+  background: #00a087;
+  color: white;
+}
+
+#zoom-panel {
+
+  margin-top: 10px;
+  text-align: center;
+}

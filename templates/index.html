@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Score Display</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            overflow: hidden; /* Prevent scrolling */
+        }
+
+        #main-container {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+            position: relative;
+            align-items: stretch; /* Allow items to stretch */
+        }
+
+        /* Top left logo */
+        #logo-container {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: white;
+            padding: 5px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Main content layout */
+        #content {
+            display: flex;
+            width: 100%;
+            align-items: flex-start; /* Align items at the start */
+            padding-top: 50px; /* Add space for logo */
+        }
+
+        /* Video feed */
+        #video-container {
+            width: 60%; /* Adjust width as needed */
+            display: flex;
+            align-items: center; /* Center items vertically */
+            justify-content: center; /* Center items horizontally */
+        }
+
+        #image {
+            width: 100%; /* Full width of its container */
+            max-height: 90vh; /* Keep height responsive */
+            border: 5px solid #ccc;
+        }
+
+        /* Scoreboard */
+        #score-board {
+            width: 30%; /* Adjust width as needed */
+            margin-left: 20px; /* Space between video and score */
+            text-align: center;
+            display: flex;
+            flex-direction: column; /* Align scoreboard items vertically */
+            justify-content: center; /* Center items */
+        }
+
+        #score {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        #bullets {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        .score {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        /* Controls */
+        #control-panel {
+            width: 20%; /* Adjust width as needed */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-left: 20px; /* Space between score and controls */
+        }
+
+        /* New Target Button */
+        #new-target {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        /* Mode and Focus Controls aligned horizontally */
+        #mode, #focus-panel, #zoom-panel {
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .button {
+            width: 150px;
+        }
+
+        .button, .circle-button, .icon-button {
+            margin: 5px;
+            padding: 10px 20px;
+            background-color: #09c48e;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .circle-button {
+            width: 50px;
+            border-radius: 100%;
+        }
+
+        .icon-button {
+            padding: 10px;
+            width: 50px;
+            height: 50px;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 50%;
+        }
+
+        .icon-button img {
+            width: 50px;
+            height: 50px;
+        }
+
+        /* Horizontal alignment for focus and zoom */
+        .horizontal-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+    
+
+    <div id="main-container">
+        <div id="content">
+            <!-- Video feed -->
+            <div id="video-container">
+                <img id="image" alt="Latest Image" style="width: 500px; height: 580px" />
+            </div>
+
+<!--            &lt;!&ndash; Scoreboard &ndash;&gt;-->
+<!--            <div id="score-board">-->
+<!--                <h2 id="score"></h2>-->
+<!--                <ul id="bullets"></ul>-->
+<!--            </div>-->
+
+            <!-- Controls -->
+            <div id="control-panel">
+                <!-- New Target Button -->
+                <div id="new-target">
+                    <button class="button" onclick="newTargetFunc()">New Target</button>
+                </div>
+
+                <!-- Mode Selection -->
+                <div id="mode">
+                    <button id="pistol" class="button" onclick="pistolFunc()">Pistol</button>
+                    <button id="rifle" class="button" onclick="rifleFunc()">Rifle</button>
+                </div>
+
+                <!-- Focus Controls (Horizontally Aligned) -->
+                <div id="focus-panel">
+                    <h3>Focus</h3>
+                    <div class="horizontal-buttons">
+                        <button id="focus-in-button" class="circle-button" onclick="focusInFunc()">+</button>
+                        <button id="focus-out-button" class="circle-button" onclick="focusOutFunc()">-</button>
+                    </div>
+                </div>
+
+                <!-- Zoom Controls (Horizontally Aligned) -->
+                <div id="zoom-panel">
+                    <h3>Zoom</h3>
+                    <div class="horizontal-buttons">
+                        <button id="zoom-in-button" class="circle-button" onclick="zoomInFunc()">+</button>
+                        <button id="zoom-out-button" class="circle-button" onclick="zoomOutFunc()">-</button>
+                    </div>
+                </div>
+
+                <!-- Score Detection -->
+                <div id="score-detection">
+                    <h3>Stream Controls</h3>
+                    <button class="icon-button" onclick="startFunc()">
+                        <img src="{{ url_for('static', filename='img/play (2).png') }}" alt="Start">
+                    </button>
+
+                    <button class="icon-button" onclick="resetFunc()">
+                        <img src="{{ url_for('static', filename='img/reload (1).png') }}" alt="Reset">
+
+
+
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function newTargetFunc() {
+            $.ajax({
+                url: "/api/new_target",
+                type: "GET",
+                success: function (data) {},
+            });
+        }
+
+        function startFunc() {
+            $("#image").css("border", "5px solid green");
+            $.ajax({
+                url: "/api/start",
+                type: "GET",
+                success: function (data) {},
+            });
+        }
+
+        function stopFunc() {
+            $("#image").css("border", "5px solid red");
+            $.ajax({
+                url: "/api/stop",
+                type: "GET",
+                success: function (data) {},
+            });
+        }
+
+        function resetFunc() {
+            $.ajax({
+                url: "/api/reset",
+                type: "GET",
+                success: function (data) {},
+            });
+            location.reload(true);
+        }
+
+        function pistolFunc() {
+            $.ajax({
+                url: "/api/pistol",
+                type: "GET",
+                success: function (data) {},
+            });
+        }
+
+        function rifleFunc() {
+            $.ajax({
+                url: "/api/rifle",
+                type: "GET",
+                success: function (data) {},
+            });
+        }
+
+        function focusInFunc() {
+            fetch('/api/focus_increase')
+                .then(response => response.text())
+                .then(data => {
+                    console.log('Focus increased:', data);
+                })
+                .catch(error => {
+                    console.error('Error increasing focus:', error);
+                });
+        }
+
+        function focusOutFunc() {
+            fetch('/api/focus_decrease')
+                .then(response => response.text())
+                .then(data => {
+                    console.log('Focus decreased:', data);
+                })
+                .catch(error => {
+                    console.error('Error decreasing focus:', error);
+                });
+        }
+
+        function zoomInFunc() {
+            fetch('/api/zoom_increase')
+                .then(response => response.text())
+                .then(data => {
+                    console.log('Zoom increased:', data);
+                })
+                .catch(error => {
+                    console.error('Error increasing zoom:', error);
+                });
+        }
+
+        function zoomOutFunc() {
+            fetch('/api/zoom_decrease')
+                .then(response => response.text())
+                .then(data => {
+                    console.log('Zoom decreased:', data);
+                })
+                .catch(error => {
+                    console.error('Error decreasing zoom:', error);
+                });
+        }
+
+          function updateData() {
+        $.ajax({
+          url: "/api/data",
+          type: "GET",
+          dataType: "json",
+          success: function (data) {
+            // console.log(data);
+            if (data.angles !== null) {
+              $("#bullets").empty();
+
+              for (let score in data.angles) {
+                data.angles[score].forEach(function (angle) {
+                  $("#bullets").append(
+                    `<li class="score">Score: ${score}, Angle: ${angle} Direction: <img
+              src="{{ url_for('static', filename='img/arrow-right.svg') }}"
+              style="transform: rotate(${angle}deg); max-width: 5%; height: auto"
+              alt="direction-arrow"
+            /> </li>`
+                  );
+                });
+              }
+            }
+            if (data.total_score !== null) {
+              $("#score").text("Total Score: " + data.total_score);
+            }
+
+            if (data.image !== null) {
+              $("#image").attr("src", "data:image/jpeg;base64," + data.image);
+            }
+          },
+          error: function (xhr, status, error) {
+            $("#score").text("Error fetching data: " + error);
+            console.error("AJAX Error:", status, error);
+          },
+        });
+      }
+
+      $(document).ready(function () {
+        updateData();
+        setInterval(updateData, 5000);
+      });
+    </script>
+</body>
+</html>

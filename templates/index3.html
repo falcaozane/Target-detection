@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Score Display</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/main.css') }}"
+    />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  </head>
+  <body>
+    <h1>Latest Score</h1>
+    <h2 id="score">Fetching data...</h2>
+    <img id="image" alt="Latest Image" />
+
+    <script>
+      function updateData() {
+        $.ajax({
+          url: "/api/data",
+          type: "GET",
+          success: function (data) {
+            console.log(data);
+            if (data.total_score !== null) {
+              $("#score").text("Total Score: " + data.total_score);
+              console.log("here");
+              console.log(data.total_score);
+            }
+            if (data.image !== null) {
+              $("#image").attr("src", "data:image/jpeg;base64," + data.image);
+            }
+          },
+          error: function () {
+            $("#score").text("Error fetching data");
+          },
+        });
+      }
+
+      $(document).ready(function () {
+        updateData();
+        setInterval(updateData, 5000); // Update every 5 seconds
+      });
+    </script>
+  </body>
+</html>

@@ -6,36 +6,20 @@ import requests
 import json
 import time
 
-
-# cap = cv.VideoCapture(1)
 aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
 parameters = aruco.DetectorParameters()
 
 URL = 'http://127.0.0.1:5000/api/starter'
 
+# Initialize the video feed from local webcam
+cap = cv.VideoCapture(0)  # 0 is usually the default webcam
 
-# Initialize the video feed
+if not cap.isOpened():
+    raise ValueError("Could not open webcam. Please check if it's connected properly.")
 
-def selected_ip():
-    try:
-        response = requests.get('http://127.0.0.1:5000/api/selected_ip')  # Flask endpoint
-        if response.status_code == 200:
-            return response.json().get('selected_ip')
-        else:
-            print("Error fetching selected IP")
-            return None
-    except Exception as e:
-        print(f"Error: {e}")
-        return None
-
-selected_ip =  "192.168.1.19"  # Fetch selected IP from the Flask app
-
-if selected_ip is None:
-    raise ValueError("No selected IP provided. Please ensure you have selected the device in the app.")
-
-# Use the selected IP in the video stream
-cap = cv.VideoCapture(f"http://{selected_ip}:8000/video_feed")  # Use dynamic IP address
-
+# You might want to set specific dimensions for consistency
+cap.set(cv.CAP_PROP_FRAME_WIDTH, 640)
+cap.set(cv.CAP_PROP_FRAME_HEIGHT, 480)
 
 x_offset = 25
 y_offset = 26
@@ -53,9 +37,7 @@ def getCorners(corners):
         elif id == 3:
             point_dict[id] = (marker[1][0][3][0] - x_offset,marker[1][0][3][1] + y_offset)
 
-
     return point_dict
-
 
 def correctPerspective(frame):
     gray_frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
@@ -74,28 +56,49 @@ def correctPerspective(frame):
 
     return frame, markers_found
 
-
 def sendData(image):
     _, img_encoded = cv.imencode('.jpg', image)
-
     files = {'image': img_encoded.tobytes()}
-
     response = requests.post(URL, files=files)
-
     return response
 
+# Display instructions to user
+print("Place the target with ArUco markers in view of the webcam")
+print("Press 'q' to exit if needed")
 
-ret, frame = cap.read()
+# Optional: Show webcam feed for user to position the target
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        print("Failed to capture frame from webcam")
+        break
+        
+    # Show the current view for alignment
+    cv.imshow("Align Target", frame)
+    
+    # Optional: Attempt to detect markers and draw them
+    gray_frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+    corners, ids, rejected = aruco.detectMarkers(image=gray_frame, dictionary=aruco_dict, parameters=parameters)
+    if ids is not None:
+        aruco.drawDetectedMarkers(frame, corners, ids)
+        cv.imshow("Markers Detected", frame)
+    
+    key = cv.waitKey(1)
+    if key == ord('q'):
+        break
+        
+    # Once all 4 markers are detected, process and send the image
+    if ids is not None and len(ids) == 4:
+        corrected_image, target_detected = correctPerspective(frame)
+        if target_detected:
+            try:
+                response = sendData(corrected_image)
+                print(f"Target initialized. Server response: {response.status_code}")
+                break  # Exit after successfully sending
+            except Exception as e:
+                print(f"Error sending data: {e}")
 
-corrected_image, target_detected = correctPerspective(frame)
-
-try:
-    if target_detected:
-        response = sendData(corrected_image)
-        print(f"Server response: {response.status_code}, {response.text}")
-except Exception as e:
-    print("The error is: ", e)
-
+# Clean up
 cap.release()
 cv.destroyAllWindows()
 print("Starter script exited")

@@ -6,61 +6,43 @@ import requests
 import json
 import time
 
-#
-# calibration_data = np.load('calibration_params.npz')
-# mtx = calibration_data['mtx']
-# dist = calibration_data['dist']
-
-
-# cap = cv.VideoCapture(1)
+# Initialize ArUco marker detection
 aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
 parameters = aruco.DetectorParameters()
+
+# Global variables
 prev_frame = None
-fps_limit = 5
+fps_limit = 5  # Frames per second limit
 start_time = time.time()
 score = {10: [], 9: [], 8: [], 7: [], 6: [], 5: [], 4: [], 3: [], 2: [], 1: []}
 angles = {10: [], 9: [], 8: [], 7: [], 6: [], 5: [], 4: [], 3: [], 2: [], 1: []}
 score_sum = 0
 URL = 'http://127.0.0.1:5000/api/score'
 
-# ring params
+# Ring parameters
 k_size = 11
 params = {'alpha': 10.0, 'beta': -9.0, 'gamma': 0}
 cny_lower = 50
 cny_upper = 100
-center_x = 0
-center_y = 0
+center_x = 254
+center_y = 247  # Adjusted from the original
 largest_radius = 0
 ring_delta = 22
 rings_radius = []
 
+# Initialize webcam
+cap = cv.VideoCapture(0)  # Use default webcam (usually 0)
 
-# Initialize the video feed
+# Set webcam properties for consistent results
+cap.set(cv.CAP_PROP_FRAME_WIDTH, 640)
+cap.set(cv.CAP_PROP_FRAME_HEIGHT, 480)
 
-def selected_ip():
-    try:
-        response = requests.get('http://127.0.0.1:5000/api/selected_ip')  # Flask endpoint
-        if response.status_code == 200:
-            return response.json().get('selected_ip')
-        else:
-            print("Error fetching selected IP")
-            return None
-    except Exception as e:
-        print(f"Error: {e}")
-        return None
-
-
-selected_ip = '192.168.1.19'  # Fetch selected IP from the Flask app
-
-if selected_ip is None:
-    raise ValueError("No selected IP provided. Please ensure you have selected the device in the app.")
-
-# Use the selected IP in the video stream
-cap = cv.VideoCapture(f"http://{selected_ip}:8000/video_feed")  # Use dynamic IP address
+# Check if webcam is opened successfully
+if not cap.isOpened():
+    raise ValueError("Could not open webcam. Please check if it's connected properly.")
 
 x_offset = 25
 y_offset = 26
-
 
 def getCorners(corners):
     point_dict = {}
@@ -77,14 +59,11 @@ def getCorners(corners):
 
     return point_dict
 
-
 def correctPerspective(frame):
-    #print("correctPerspective: Converting frame to grayscale and detecting Aruco markers")
     gray_frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
     corners, ids, rejected = aruco.detectMarkers(image=gray_frame, dictionary=aruco_dict, parameters=parameters)
     markers_found = False
     if ids is not None and len(ids) == 4:
-        #print(f"correctPerspective: Aruco markers detected with IDs: {ids}")
         combined = tuple(zip(ids, corners))
         point_dict = getCorners(combined)
         points_src = np.array([point_dict[0], point_dict[3], point_dict[1], point_dict[2]])
@@ -95,228 +74,211 @@ def correctPerspective(frame):
         frame = image_out
         markers_found = True
     else:
-        print("correctPerspective: No valid Aruco markers found")
+        print("No valid ArUco markers found. Make sure all 4 markers are visible.")
 
     return frame, markers_found
 
-
 def getBullets(th1, output_frame, draw=True):
-    #print("getBullets: Detecting bullets from contours")
     mask = th1
     kernel = np.ones((3, 3), np.uint8)
     mask = cv.dilate(mask, kernel, iterations=2)
     contours = cv.findContours(mask, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)[0]
     bullets = []
+    
     for contour in contours:
-        approx = cv.approxPolyDP(contour, 0.02 * cv.arcLength(contour, True), True)
-        ((x, y), radius) = cv.minEnclosingCircle(contour)
-        print(radius)
-        bullets.append((int(x), int(y)))
-        if draw:
-            cv.circle(output_frame, (int(x), int(y)), (int(radius)), (0, 0, 255), 2)
+        area = cv.contourArea(contour)
+        # Filter by area
+        if 5 <= area <= 400:  # Adjusted for typical bullet hole sizes
+            approx = cv.approxPolyDP(contour, 0.02 * cv.arcLength(contour, True), True)
+            ((x, y), radius) = cv.minEnclosingCircle(contour)
+            
+            # Additional filter - ensure it's somewhat circular
+            if len(approx) >= 5:  # More points suggests a more circular shape
+                bullets.append((int(x), int(y)))
+                if draw:
+                    cv.circle(output_frame, (int(x), int(y)), (int(radius)), (0, 0, 255), 2)
 
-    #print(f"getBullets: Bullets detected: {bullets}")
     return bullets
-
 
 def calculateDistance(x1, y1):
     x2 = center_x
     y2 = center_y
     radius = math.sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1))
-    #print(f"calculateDistance: Distance calculated between ({x1}, {y1}) and ({x2}, {y2}) is {radius}")
     return radius
 
+def calculateAngle(x, y):
+    delta_x = (x - center_x)
+    delta_y = (y - center_y)
+    if delta_x == 0:
+        angle = -90
+    else:
+        angle = round(math.atan2(delta_y, delta_x) * 180 / math.pi)
+    return angle
 
-# def updateScore(bullets):
-#     global score_sum, score, angles
-#
-#     #print(f"updateScore: Updating score with bullets: {bullets}")
-#     for x, y in bullets:
-#         dist = calculateDistance(x, y)
-#         angle = calculateAngle(x, y)
-#         for i in range (0,10):
-#             minrange = 0 if i == 11 else rings_radius[i+1]
-#             if minrange<=dist<=rings_radius[i]:
-#                 score[i+1].append((x,y))
-#                 score_sum = i+1
-#                 angles[i+1].append(angle)
-#                 break
-#     print(f"score_sum: {score_sum}\n{angles}")
-
+def updateScore(bullets):
+    global score_sum, score, angles
+    
+    for x, y in bullets:
+        dist = calculateDistance(x, y)
+        angle = calculateAngle(x, y)
+        
+        # Score based on distance from center
+        if 0 <= dist <= 23:
+            score[10].append((x, y))
+            score_sum += 10
+            angles[10].append(angle)
+        elif 23 < dist <= 53:
+            score[9].append((x, y))
+            score_sum += 9
+            angles[9].append(angle)
+        elif 53 < dist <= 79:
+            score[8].append((x, y))
+            score_sum += 8
+            angles[8].append(angle)
+        elif 79 < dist <= 105:
+            score[7].append((x, y))
+            score_sum += 7
+            angles[7].append(angle)
+        elif 105 < dist <= 135:
+            score[6].append((x, y))
+            score_sum += 6
+            angles[6].append(angle)
+        elif 135 < dist <= 162:
+            score[5].append((x, y))
+            score_sum += 5
+            angles[5].append(angle)
+        elif 162 < dist <= 188:
+            score[4].append((x, y))
+            score_sum += 4
+            angles[4].append(angle)
+        elif 188 < dist <= 215:
+            score[3].append((x, y))
+            score_sum += 3
+            angles[3].append(angle)
+        elif 215 < dist <= 242:
+            score[2].append((x, y))
+            score_sum += 2
+            angles[2].append(angle)
+        elif 242 < dist <= 268:
+            score[1].append((x, y))
+            score_sum += 1
+            angles[1].append(angle)
 
 def drawFrame(frame):
-    #print("drawFrame: Drawing score on frame")
     i = 1
     for points in score.keys():
-        frame = cv.putText(frame, f"{points}:{len(score[points])}", (0, 20 * i), cv.FONT_HERSHEY_COMPLEX, 0.5,
-                           (0, 0, 255), 2)
+        frame = cv.putText(frame, f"{points}: {len(score[points])}", (10, 30 * i), 
+                          cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
         i += 1
+    
+    # Add total score
+    frame = cv.putText(frame, f"Total: {score_sum}", (10, 30 * i), 
+                      cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
     return frame
 
-
 def sendData(image, angles):
-    #print("sendData: Sending data to server")
     _, img_encoded = cv.imencode('.jpg', image)
     files = {'image': img_encoded.tobytes(),
              'angles': (None, json.dumps(angles), 'application/json')}
     try:
         response = requests.post(URL, files=files)
-        #print(f"sendData: Response from server: {response.status_code}, {response.text}")
         return response
     except Exception as e:
-        print(f"sendData: Error sending data: {e}")
+        print(f"Error sending data: {e}")
         return None
 
-
-# def calculateAngle(x, y):
-#     delta_x = (x - center_x)
-#     delta_y = (y - center_y)
-#     if delta_x == 0:
-#         angle = -90
-#     else:
-#         angle = round(math.atan2(delta_y, delta_x) * 180 / math.pi)
-#     #print(f"calculateAngle: Angle calculated: {angle} for point ({x}, {y})")
-#     return angle
-
-
-def sharpImageGen(frame):
-    frame1 = frame.copy()
-    gray = cv.cvtColor(frame1, cv.COLOR_BGR2GRAY)
-    gray_blurred = cv.GaussianBlur(gray, (k_size, k_size), 2)
-    sharpened_image = cv.addWeighted(gray, params['alpha'], gray_blurred, params['beta'], params['gamma'])
-    return sharpened_image
-
-
-def contourDetection(frame):
-    global center_x, center_y, largest_radius
-    image = frame.copy()
-    gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
-    blurred = cv.GaussianBlur(gray, (k_size, k_size), 2)
-    #_, th1 = cv.threshold(frame, 175, 255, cv.THRESH_BINARY)
-    edges = cv.Canny(blurred, cny_lower, cny_upper)
-    contours, hierarchy = cv.findContours(edges, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
-    max_area = 0
-    #cv.imshow("edge",edges)
-    #cv.imshow("threshold",th1)
-    #cv.imshow("framee",frame)
-    #cv.waitKey(1000)
-    for contour in contours:
-        perimeter = cv.arcLength(contour, True)
-        approx = cv.approxPolyDP(contour, 0.02 * perimeter, True)
-
-        if len(approx) >= 5:
-            area = cv.contourArea(contour)
-            #print(area)
-            if area > max_area:
-                max_area = area
-                
-                (x, y), radius = cv.minEnclosingCircle(contour)
-                center_x = x
-                center_y = y+7
-                y += 7
-                largest_radius = radius
-                cv.circle(image, (int(x), int(y)), int(radius), (0, 0, 255), 3)
-                cv.circle(image, (int(x), int(y)), 1, (0, 255, 255), 3)
-                
-            # cv2.circle(image, (int(x), int(y)), int(radius), (0, 255, 0), 2)
-            # cv2.circle(image, (int(x), int(y)), 2, (0, 0, 255), 3)
-            cv.drawContours(image, [contour], -1, (0, 255, 0), 2)
-            #cv.imshow("countour", image)
-            
-            cv.waitKey(100);
-                    
-    getRings()
-    drawRings(frame.copy())
-    
-    return image
-
-
-def getRings():
-    global center_x, center_y,largest_radius,ring_delta,rings_radius
-    for i in range(10):
-        # cv.circle(frame, (int(center_x), int(center_y)), int(largest_radius - ring_delta * i), (255, 255, 0), 2)
-        rings_radius.append(int(largest_radius - ring_delta * i))
-
-
 def drawRings(canvas):
-    center_cir = (int(center_x), int(center_y))
-    cv.circle(canvas, center_cir, 1, (0, 0, 255), 2)
-    for i in range(10):
-        cv.circle(canvas, center_cir , (rings_radius[i]), (255, 0, 255), 2)
-        cv.imshow("rings", canvas)
-            
-        cv.waitKey(100);
-    #cv.waitKey(0);        
+    cv.circle(canvas, (center_x, center_y), 3, (0, 0, 255), -1)  # Center point
+    cv.circle(canvas, (center_x, center_y), 23, (255, 0, 255), 2)  # 10
+    cv.circle(canvas, (center_x, center_y), 53, (255, 0, 255), 2)  # 9
+    cv.circle(canvas, (center_x, center_y), 79, (255, 0, 255), 2)  # 8
+    cv.circle(canvas, (center_x, center_y), 105, (255, 0, 255), 2) # 7
+    cv.circle(canvas, (center_x, center_y), 135, (255, 0, 255), 2) # 6
+    cv.circle(canvas, (center_x, center_y), 162, (255, 0, 255), 2) # 5
+    cv.circle(canvas, (center_x, center_y), 188, (255, 0, 255), 2) # 4
+    cv.circle(canvas, (center_x, center_y), 215, (255, 0, 255), 2) # 3
+    cv.circle(canvas, (center_x, center_y), 242, (255, 0, 255), 2) # 2
+    cv.circle(canvas, (center_x, center_y), 268, (255, 0, 255), 2) # 1
+    return canvas
 
+# Main execution starts here
+print("Starting scoring script with webcam")
+print("Press 'q' to exit the application")
 
-# def get_current_score():
-#     #print("get_current_score: Fetching current score from server")
-#     try:
-#         response = requests.get('http://127.0.0.1:5000/api/data')
-#         if response.status_code == 200:
-#             #print("get_current_score: Score data fetched successfully")
-#             return response.json().get('angles')
-#         else:
-#             print(f"get_current_score: Error fetching score, status code: {response.status_code}")
-#             return None
-#     except Exception as e:
-#         print(f"get_current_score: Error: {e}")
-#         return None
-
-#
-# angles = get_current_score()
-# #print(f"Initial angles: {angles}")
-# if angles is None:
-#     angles = {10: [], 9: [], 8: [], 7: [], 6: [], 5: [], 4: [], 3: [], 2: [], 1: []}
-# for val in angles.keys():
-#     score_sum += int(val) * len(angles[val])
-
+# First, let's get a frame to initialize
 ret, frame = cap.read()
-corrected_image, target_detected = correctPerspective(frame)
+if not ret:
+    print("Failed to capture initial frame from webcam")
+    cap.release()
+    cv.destroyAllWindows()
+    exit(1)
 
-if target_detected:
-    shp_img = cv.cvtColor(sharpImageGen(corrected_image),cv.COLOR_GRAY2BGR)
-    shp_cir_ctd = contourDetection(shp_img)
-    getRings()
-    
-
+# Main processing loop
 while True:
     ret, frame = cap.read()
-    # frame = cv.undistort(frame, mtx, dist, None)
     if not ret:
-        print("Error with Webcam")
+        print("Error with webcam")
         break
 
     curr_time = time.time()
-    if ((curr_time - start_time)) > fps_limit:
+    if (curr_time - start_time) > (1.0 / fps_limit):  # Limit processing rate
+        # Process the frame
         corrected_image, target_detected = correctPerspective(frame)
-        frame = corrected_image.copy()
-
-        #frame = cv.GaussianBlur(frame, (5, 5), 0)
-        output_frame = frame.copy()
-
+        
         if target_detected:
+            output_frame = corrected_image.copy()
+            output_frame = drawRings(output_frame)  # Draw target rings
+            
+            # Look for changes between frames to detect new bullet holes
             if prev_frame is not None:
-                diff = cv.absdiff(prev_frame, frame)
+                # Compute difference between current and previous frame
+                diff = cv.absdiff(prev_frame, corrected_image)
                 gray = cv.cvtColor(diff, cv.COLOR_BGR2GRAY)
-                #blur = cv.GaussianBlur(gray, (7, 7), 0)
                 blur = cv.medianBlur(gray, 5)
-                _, th1 = cv.threshold(blur, 127, 255, cv.THRESH_BINARY)
+                _, th1 = cv.threshold(blur, 30, 255, cv.THRESH_BINARY)
+                
+                # Detect bullets from the difference image
                 bullets = getBullets(th1, output_frame)
-                # updateScore(bullets)
-
-            prev_frame = frame
-            sendData(frame, angles)
-            frame = drawFrame(output_frame)
-            #cv.imshow("frame7",frame)
+                
+                # If new bullet holes are detected, update score
+                if bullets:
+                    updateScore(bullets)
+                    print(f"New bullet points detected: {bullets}")
+                
+                # Display intermediate processing results
+                cv.imshow("Difference", diff)
+                cv.imshow("Threshold", th1)
+            
+            # Update previous frame for next iteration
+            prev_frame = corrected_image.copy()
+            
+            # Draw scores on the output frame
+            output_frame = drawFrame(output_frame)
+            
+            # Send data to the server
+            sendData(output_frame, angles)
+            
+            # Show the processed frame
+            cv.imshow("Target Analysis", output_frame)
+        else:
+            # If no target detected, show the raw frame with instructions
+            cv.putText(frame, "No target detected - Position ArUco markers in view", 
+                      (10, 30), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+            cv.imshow("Webcam", frame)
+        
+        # Reset timer for frame rate limiting
         start_time = time.time()
 
-    cv.imshow("Frame", frame)
-
+    # Check for exit command
     if cv.waitKey(1) & 0xFF == ord('q'):
         print("Exit signal received, closing the application.")
         break
 
-sendData(frame, angles)
+# Final data send before exit
+if target_detected:
+    sendData(output_frame, angles)
+
+# Clean up
 cap.release()
 cv.destroyAllWindows()
+print("Scoring script exited")
